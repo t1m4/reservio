@@ -20,7 +20,7 @@ def change_url(url):
     url = url.replace("to%5D=2020-07-20","to%5D="+next_month.strftime("%Y-%m-%d"))
     return url
 
-def load_date():#return dict
+def load_date():
     """
     :param url: str
     :return: dict
@@ -30,37 +30,35 @@ def load_date():#return dict
     return json.loads(requests.get(url).text)
 
 
-def check_free_date(user, our_date, lock):
+def check_free_date(bot, message):
     """
     :param our_date: str
     :return: str
     """
+    user = str(message.chat.id)
+    our_date = str(message.text)
     while True:
-        time.sleep(5)
+        time.sleep(1)
         try:
-            lock.acquire()
-            try:
-                date = read_date(user)
-                if our_date != date:
+            date = read_date(user)
+            if our_date != date:
+                    write_result_date(user, "", False)
                     break
-            finally:
-                lock.release()
             data_list = load_date()["data"]
             for data in data_list:
                 if data['attributes']["isAvailable"] == True:
                     if compare_date(our_date, data['attributes']["date"]):
-                        lock.acquire()
-                        try:
-                            write_result_date(user, data['attributes']["date"])
-                            return ""
-                        finally:
-                            lock.release()
+                        bot.send_message(message.from_user.id, "Ура, освободивась новая дата " + data['attributes']["date"])
+                        bot.send_message(message.from_user.id, "Поставте новую дату /date")
+                        write_result_date(user, data['attributes']["date"], True)
+                        return ""
                     else:
                         break
 
         except Exception as e:
             config.write_log(e)
             continue
+
 def read_date(user):
     """
     :param user: str
@@ -69,17 +67,19 @@ def read_date(user):
     with open("result.json", "r") as f:
         result = json.loads(f.read())
         return result[user][1]
-
-def write_result_date(user, date):
+def write_result_date(user, date, flag):
     """
     :param user: str
     :param date: str
+    :param flag: bool, для записи, что нашли дату.
     :return:
     """
     result = ""
     with open("result.json", "r") as f:
         result = json.loads(f.read())
         result[user][2] = date
+        if flag:
+            result[user][1] = "1970-01-01 "
     with open("result.json", "w") as f:
         f.write(json.dumps(result))
 
